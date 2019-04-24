@@ -1,0 +1,24 @@
+when ACCESS_POLICY_AGENT_EVENT {
+
+   if { [ACCESS::policy agent_id] eq "CertDate-Check" } {
+
+       set x [clock format [clock seconds] -format {%b %d %T %Y %Z} -gmt 0]
+       set y [clock scan $x]
+       log local0. "Now: $x  ->  $y"
+     
+       set a [ACCESS::session data get session.ssl.cert.end]
+       set b [clock scan $a]
+       set c [clock format $b -format {%b %d %T %Y %Z} -gmt 0]
+       log local0. "Client Cert: $a  ->  $b  ->  $c"
+       
+       if { $x >= $c } {
+          log local0. "Client Cert is expired"
+          ACCESS::session data set session.custom.certexpire.result "expire"
+       } else {
+          log local0. "Client Cert is *Not* expired"
+          ACCESS::session data set session.custom.certexpire.result "not-expire"
+       }
+   
+   }
+
+}
