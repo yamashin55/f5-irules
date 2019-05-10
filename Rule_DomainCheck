@@ -1,0 +1,18 @@
+when RULE_INIT {
+    set static::THIS_DOMAIN ".nsg.com"
+}
+when ACCESS_POLICY_AGENT_EVENT {
+    set list [split  [string tolower [ACCESS::session data get session.windows_info_os.last.computer]] "|"]
+    set list1 [split  [string tolower [ACCESS::session data get session.windows_info_os.last.user]] "|"]
+    ACCESS::session data set session.windows_info_os.last.fqdn [lindex $list 8]
+    ACCESS::session data set session.logon.last.username [lindex $list1 1]
+    log local0.info "PC:[lindex $list 8]  USER:[lindex $list1 1]"
+
+    set computer [string tolower [ACCESS::session data get session.windows_info_os.last.computer]]
+    foreach x [split $computer "|"] {
+        if { $x ends_with $static::THIS_DOMAIN } {
+            ACCESS::session data set session.windows_info_os.last.fqdn $x
+            return
+        }
+    }
+}
