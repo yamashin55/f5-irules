@@ -1,0 +1,56 @@
+when ACCESS_POLICY_AGENT_EVENT {
+
+  if { [ACCESS::policy agent_id] eq "mac-check-rule" } {
+    set uid [ACCESS::session data get session.logon.last.username]
+    set mac0 [ACCESS::session data get session.machine_info.last.net_adapter.list.\[0\].mac_address]
+    set mac1 [ACCESS::session data get session.machine_info.last.net_adapter.list.\[1\].mac_address]
+    set mac2 [ACCESS::session data get session.machine_info.last.net_adapter.list.\[2\].mac_address]
+    set mac3 [ACCESS::session data get session.machine_info.last.net_adapter.list.\[3\].mac_address]
+    set mac4 [ACCESS::session data get session.machine_info.last.net_adapter.list.\[4\].mac_address]
+    set mac5 [ACCESS::session data get session.machine_info.last.net_adapter.list.\[5\].mac_address]
+    log local0.info "User: $uid / MAC0: $mac0, MAC1: $mac1, MAC2: $mac2, MAC3: $mac3, MAC4: $mac4, MAC5: $mac5"
+
+
+    if { $mac0 equals "" and $mac1 equals "" and $mac2 equals "" and $mac3 equals "" and $mac4 equals "" and $mac5 equals ""} {
+      log "mac_check: not found"
+	  ACCESS::session data set session.mac_check.result "2"  
+      return
+    }
+
+    if { [class match $mac0 equals MAC_DATA] } {
+      ACCESS::session data set session.mac_check.result "0"
+      log "mac0_check ok: [ACCESS::session data get session.mac_check.result]"
+	  return  
+
+	} elseif { [class match $mac1 equals MAC_DATA] } {
+      ACCESS::session data set session.mac_check.result "0"
+      log "mac1_check ok: [ACCESS::session data get session.mac_check.result]"
+	  return   
+
+	} elseif { [class match $mac2 equals MAC_DATA] } {
+      ACCESS::session data set session.mac_check.result "0"
+      log "mac2_check ok: [ACCESS::session data get session.mac_check.result]"
+	  return   
+
+	} elseif { [class match $mac3 equals MAC_DATA] } {
+      ACCESS::session data set session.mac_check.result "0"
+      log "mac3_check ok: [ACCESS::session data get session.mac_check.result]"
+	  return   
+
+	} elseif { [class match $mac4 equals MAC_DATA] } {
+      ACCESS::session data set session.mac_check.result "0"
+      log "mac4_check ok: [ACCESS::session data get session.mac_check.result]"
+	  return   
+
+	} elseif { [class match $mac5 equals MAC_DATA] } {
+      ACCESS::session data set session.mac_check.result "0"
+      log "mac5_check ok: [ACCESS::session data get session.mac_check.result]"
+	  return   
+
+    } else {
+      ACCESS::session data set session.mac_check.result "1"
+      log "mac_check ng: [ACCESS::session data get session.mac_check.result]"
+    }
+  }
+
+}
