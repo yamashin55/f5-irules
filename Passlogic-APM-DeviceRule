@@ -1,0 +1,104 @@
+when RULE_INIT {
+# Set the IP:Port of PassLogic Enterprise Edition
+	set static::passlogicip "10.10.80.122"
+	set static::passlogicport 7080
+}
+
+when ACCESS_POLICY_AGENT_EVENT {
+
+#   Check Shared Device (Required to set HW Info to DataGroup SharedDevices HWInfo:=DeviceKind)
+    if { [ACCESS::policy agent_id] eq "IsSharedDevice" } {
+        set uname [ACCESS::session data get session.logon.last.username]
+        set hwinfo [ACCESS::session data get session.passlogic.hwinfo]
+        set devkind [ACCESS::session data get session.passlogic.devicekind]
+        if { [class match -value $hwinfo eq SharedDevices] eq $devkind } {
+            log local0. "User $uname is accessed with shared device kind=$devkind ($hwinfo)"
+            ACCESS::session data set session.isshareddevice "yes"
+        } else {
+            log local0. "User $uname is accessed with non-shared device kind=$devkind ($hwinfo)"
+            ACCESS::session data set session.isshareddevice "no"
+        }            
+    }
+
+#   Device HW Information will be registed to PassLogic RADIUS Attribute
+    if { [ACCESS::policy agent_id] eq "RegistHWInfoToPassLogic" } {
+        # Get APM session variables
+        set uname [ACCESS::session data get session.logon.last.username]
+        set dom [ACCESS::session data get session.logon.last.domain]
+        set rattr [ACCESS::session data get session.passlogic.attr]
+        set devkind [ACCESS::session data get session.passlogic.devicekind]
+        set hwinfo [ACCESS::session data get session.passlogic.hwinfo]
+        set rewrite9 [ACCESS::session data get session.passlogi.setrewrite9]
+        set newattr ""
+        log local0. "username = $uname device=$devkind hw=$hwinfo"
+        log local0. "Old Attribute = $rattr"
+
+        if { $rewrite9 eq "yes" } {
+            log local0. "Rewrite not device kind ($devkind) but any device (9)"
+            set devkind 9
+        }
+        # flag for change attribute
+        set addd 0
+        foreach i [split $rattr |] {
+            if { $i eq $devkind } {
+                if { $addd == 0 } {
+                    # Generate new attribute data for regist new device
+                    set tstr $newattr
+                    set newattr "$tstr$hwinfo|"
+                    set addd 1
+                } else {
+                    set tstr $newattr
+                    set newattr "$tstr$i|"
+                }
+            } else {
+                    set tstr $newattr
+                    set newattr "$tstr$i|"
+            }
+        }
+        if { $addd == 1 } {
+            log local0. "New DeviceID ($hwinfo) for user $uname will be registered to PassLogic. New RADIUS Attribute=$newattr"
+            set conn [connect -timeout 10000 -idle 30 -status conn_status $static::passlogicip $static::passlogicport ]
+            log local0. "Connect returns: <$conn> and conn status: <$conn_status> "
+            set conn_info [connect info -idle -status $conn]
+            log local0. "Connect info: <$conn_info>"
+            set data "GET /passlogic/api/admin?mode=useredit&uid=$uname&domain=$dom&attribute1=$newattr HTTP/1.0\r\n\r\n"
+            set send_info [send -timeout 3000 -status send_status $conn $data]
+            log local0. "Sent <$send_info> bytes and send status: <$send_status>"
+            set recv_data [recv -timeout 3000 -status recv_status 1024 $conn]
+            log local0. "Recv data: <$recv_data> and recv status: <$recv_status>"
+            close $conn
+            log local0. "Closed; conn info: <[connect info -status $conn]>"
+            log local0. "PassLogic response is correct."
+
+            if { $recv_data contains "PassLogic" } {
+                set ret [string range [findstr $recv_data "<code>" 0 "</code>"] 6 10]
+                log local0. "Result Code = $ret"
+                ACCESS::session data set session.passlogic.result $ret
+                switch $ret {
+                    "50300"	{ 
+                        ACCESS::session data set session.passlogic.error "PassLogic Error: err Invalid input data."
+                        log local0. "PassLogic Error: err Invalid input data."
+                    }
+                    "50301"	{ 
+                        ACCESS::session data set session.passlogic.error "PassLogic Error: err The user does not exist."
+                        log local0. "PassLogic Error: err The user does not exist."
+                    }
+                    "50302"	{ 
+                        ACCESS::session data set session.passlogic.error "PassLogic Error: err Update parameter is required."
+                        log local0. "PassLogic Error: err Update parameter is required." 
+                    }
+                    "50400"	{ 
+                        ACCESS::session data set session.passlogic.error "PassLogic Information: notice User information has updated successfully. New DeviceID ($hwinfo) for user $uname was registered."
+                        log local0. "PassLogic Information: notice User information has updated successfully. New DeviceID ($hwinfo) for user $uname was registered." 
+                    }
+                    "50499"	{ 
+                        ACCESS::session data set session.passlogic.error "PassLogic Error: crit System error occurred."
+                        log local0. "PassLogic Error: crit System error occurred." 
+                    }
+                }
+            }
+        } else {
+            ACCESS::session data set session.passlogic.result "NG"
+        }
+    }
+}
