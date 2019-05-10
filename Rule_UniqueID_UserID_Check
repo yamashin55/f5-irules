@@ -1,0 +1,20 @@
+when ACCESS_POLICY_AGENT_EVENT {
+   if { [ACCESS::policy agent_id] eq "UniqueID-Check" } {
+      set sid [ACCESS::session data get session.user.sessionid]
+      set username [ACCESS::session data get session.logon.last.username]
+      set mdm_uniqueid "[ACCESS::session data get session.client.mdm_device_unique_id]"
+      set uniqueid "[ACCESS::session data get session.client.unique_id]"
+      #log local0.info "sid: $sid / username: $username / mdm_uniqueid: $mdm_uniqueid / uniqueid: $uniqueid"
+
+      if { [class match $uniqueid contains UniqueID_DATA] || [class match $mdm_uniqueid contains UniqueID_DATA ] } {
+         if { [class match -value $uniqueid equals UniqueID_DATA] eq $username || [class match -value $mdm_uniqueid equals UniqueID_DATA] eq $username } {
+            ACCESS::session data set session.custom.unique_id.result "0"
+         } else {
+            ACCESS::session data set session.custom.unique_id.result "2"
+         }
+      } else {
+         ACCESS::session data set session.custom.unique_id.result "1"
+      }
+      log local0.notice "UserName: $username / SessionID: $sid / CheckResult: [ACCESS::session data get session.custom.unique_id.result] / UniqueID: $mdm_uniqueid"
+   }
+}
