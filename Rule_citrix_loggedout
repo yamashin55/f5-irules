@@ -1,0 +1,27 @@
+when CLIENT_ACCEPTED {
+    set citrix_logout 0
+}
+when ACCESS_ACL_ALLOWED {
+    set type [ACCESS::session data get session.client.type]
+    if { !($type starts_with "citrix") } {
+        set storeWebName "/citrix/storeweb/"
+        set http_uri [HTTP::uri]
+        if { $http_uri == "/cgi/logout" } {
+            if { "ACCESS::session remove" != "" } {
+               ACCESS::respond 302 Location /vdesk/hangup.php3
+            } else {
+               ACCESS::respond 200 content "Logoff is successful.\r\n" Connection close
+            }
+        }
+        if { $http_uri == "/" || ($citrix_logout eq 0 && $http_uri ends_with "login.aspx") } {
+            log local0. "For [HTTP::uri] Redirecting to $storeWebName"
+            ACCESS::respond 302 Location "https://[HTTP::host]$storeWebName"
+        } elseif { $http_uri contains "Logoff" } {
+            set citrix_logout 1
+        } elseif { $citrix_logout eq 1 && $http_uri ends_with "login.aspx" } {
+            set citrix_logout 0
+            ACCESS::respond 200 content "Logged out\r\n" Connection close
+            ACCESS::session remove
+        }
+    }
+}
