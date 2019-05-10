@@ -1,0 +1,17 @@
+when RULE_INIT {
+ set static::DEBUG 1
+}
+when HTTP_PROXY_REQUEST {
+   if {[ class match [HTTP::host] contains ext_o365_url ]}{
+      if { $static::DEBUG } { log local0.info "O365:  [HTTP::method] [IP::client_addr]:[TCP::client_port] -> [HTTP::host] [HTTP::uri]"}
+      HTTP::proxy enable
+      snat automap
+   } else {
+      #HTTP::header insert X-Forwarded-For [IP::client_addr]
+      HTTP::header insert X-Forwarded-For "192.168.100.100"
+      if { $static::DEBUG } { log local0.info "Other: [HTTP::method] [IP::client_addr]:[TCP::client_port] -> [HTTP::host] [HTTP::uri]"}
+      HTTP::proxy disable
+      snat automap
+      pool pool-proxy
+   }
+}
