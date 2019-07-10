@@ -1,0 +1,10 @@
+when ACCESS_SESSION_STARTED {
+  if {[HTTP::header exists X-Forwarded-For]} {
+    set clientip [IP::client_addr]
+    set originalxff [HTTP::header values X-Forwarded-For]
+    set firstxff [lindex [ split [lindex [HTTP::header values X-Forwarded-For] 0] "," ] 0]
+    log local0.info "clinttip: $clientip / original-xff: $originalxff / first-xff: $firstxff"
+    ACCESS::session data set session.custom.original-clientip $clientip
+    ACCESS::session data set session.user.clientip [lindex [ split [lindex [HTTP::header values X-Forwarded-For] 0] "," ] 0]
+  }
+}
