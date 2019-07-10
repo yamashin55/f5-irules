@@ -1,10 +1,14 @@
+# Client address is translated by ELB, and ELB insert XFF header.
+# When an Access session is started, APM substitutes the first X-Forwarded-For header for "session.clinetip"
 when ACCESS_SESSION_STARTED {
   if {[HTTP::header exists X-Forwarded-For]} {
     set clientip [IP::client_addr]
     set originalxff [HTTP::header values X-Forwarded-For]
-    set firstxff [lindex [ split [lindex [HTTP::header values X-Forwarded-For] 0] "," ] 0]
-    log local0.info "clinttip: $clientip / original-xff: $originalxff / first-xff: $firstxff"
-    ACCESS::session data set session.custom.original-clientip $clientip
-    ACCESS::session data set session.user.clientip [lindex [ split [lindex [HTTP::header values X-Forwarded-For] 0] "," ] 0]
+    set firstxff [lindex [ split [lindex $originalxff 0] "," ] 0]
+    set count [llength [HTTP::header values X-Forwarded-For]]
+    set lastxff [lindex [ split [lindex $originalxff 0] "," ] $count]
+    log local0.info "set apm session.clintip: $clientip / original-xff: $originalxff / first-xff: $firstxff  / last:$lastxff "
+    ACCESS::session data set session.custom.original-clientip [IP::client_addr]
+    ACCESS::session data set session.user.clientip [lindex [ split [lindex [HTTP::header values X-Forwarded-For] 0] "," ] $count]
   }
 }
