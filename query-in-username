@@ -1,0 +1,11 @@
+when ACCESS_SESSION_STARTED {
+    #log local0. "HTTP Query: [HTTP::query]"
+    set query [split [HTTP::query] &]
+    foreach q $query {
+        if { $q starts_with "username" } {
+            set username [lindex [split $q =] 1]
+            #log local0. "username: $username"
+            ACCESS::session data set session.logon.last.username $username
+        }
+    }
+}
