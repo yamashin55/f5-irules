@@ -1,0 +1,10 @@
+when ACCESS_SESSION_STARTED {
+    foreach aHeader [HTTP::header names] {
+       #log local0. "$aHeader: [HTTP::header value $aHeader]"
+       if { $aHeader starts_with "USERNAME" } {
+          set username [HTTP::header value $aHeader]
+          log local0. "Client [IP::client_addr]:[TCP::client_port] -> USERNAME:$username [HTTP::host][HTTP::uri]"
+          ACCESS::session data set session.logon.last.username $username
+       }
+    }
+}
