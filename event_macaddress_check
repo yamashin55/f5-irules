@@ -1,0 +1,81 @@
+when ACCESS_POLICY_AGENT_EVENT {
+  # - If the MAC address is registered as a shared device, check whether the user name is registered in the data-group.
+  #   Data-Group name of shared device: dg_share_macaddress
+  #   ---------- dg_share_macaddress -----------
+  #   "A8:13:74:93:62:9DA" := "<data-gorup-name>",
+  #   "F6:8C:50:6B:5C:60A" := "dg_group_daily_user",
+  #   "F4:8C:50:6B:5C:61A" := "dg_group_daily_user",
+  #   ---------- dg_group_daily_user -----------
+  #   "<username>" := "",
+  #   "user01" := "",
+  #   "user02" := "",
+  #
+  # - Check that the MAC Address is allowed and that the username matches on the Device(PC).
+  #   Data-Group name of shared device: dg_user_macaddress
+  #   ---------- dg_user_macaddress -----------
+  #   "A8:13:74:93:62:9D" := "user01",
+  #   "F6:8C:50:6B:5C:61" := "user02",
+  #
+  # - session.custom.mac_check_result -> OK/NG/Empty
+  #
+  if { [ACCESS::policy agent_id] eq "event_macaddress_check" } {
+    # Set username, mac address.
+    set username [ACCESS::session data get session.logon.last.username]
+    set mac0 [ACCESS::session data get session.machine_info.last.net_adapter.list.\[0\].mac_address]
+    set mac1 [ACCESS::session data get session.machine_info.last.net_adapter.list.\[1\].mac_address]
+    set mac2 [ACCESS::session data get session.machine_info.last.net_adapter.list.\[2\].mac_address]
+    set mac3 [ACCESS::session data get session.machine_info.last.net_adapter.list.\[3\].mac_address]
+    set mac4 [ACCESS::session data get session.machine_info.last.net_adapter.list.\[4\].mac_address]
+    #log local0.info "USER: $username / MAC0: $mac0, MAC1: $mac1, MAC2: $mac2, MAC3: $mac3, MAC4: $mac4"
+
+    # Check mac address is empty.
+    if { $mac0 equals "" and $mac1 equals "" and $mac2 equals "" and $mac3 equals "" and $mac4 equals ""} {
+      log local0.info "USER: $username / mac_check: not found (Empty)"
+      ACCESS::session data set session.custom.mac_check_result "Empty"  
+      return
+      
+    # If mac address exist.
+    } else {
+      set mac_address_list [list $mac0 $mac1 $mac2 $mac3 $mac4]
+      set msg "MAC Address not matched."
+      
+      foreach mac_address $mac_address_list {
+        # Check share device. 
+        if { [class match $mac_address equals dg_share_macaddress] } {
+          set dgname [class lookup $mac_address dg_share_macaddress]
+            # Check username.
+            if { [class match $username equals $dgname] } {
+              ACCESS::session data set session.custom.mac_check_result "OK"
+              set msg "ShareDevice: $dgname / MACAddr: $mac_address"
+              #log local0.info "USER(OK): $username / ShareDevice: $dgname / MACAddr: $mac_address"
+              break
+            } else {
+              ACCESS::session data set session.custom.mac_check_result "NG"
+              set msg "ShareDevice: $dgname / This username does not matched in data-group."
+              #log local0.info "USER(NG): $username / ShareDevice: $dgname / MACAddr: $mac_address / This username does not matched in data-group." 
+              break
+            }
+        # Check userself device.
+        } elseif { [class match $mac_address equals dg_user_macaddress] } {
+          # Check username.
+          if { [class lookup $mac_address dg_user_macaddress] == $username } {
+            ACCESS::session data set session.custom.mac_check_result "OK"
+            set msg "UserSelfDevice, / MACAddr: $mac_address"
+            #log local0.info "USER(OK): $username / UserSelfDevice, / MACAddr: $mac_address"
+            break          
+          } else {
+            ACCESS::session data set session.custom.mac_check_result "NG"
+            set msg "UserSelfDevice, / MACAddr: $mac_address / Username does not allowed on this device."
+            #log local0.info "USER(NG): $username / UserSelfDevice, / MACAddr: $mac_address"
+            break
+          }
+        } else {
+          ACCESS::session data set session.custom.mac_check_result "NG"
+          set msg "This device does not allow."
+          #log local0.info "USER(NG): $username / MACAddr: $mac_address / This MAC Address does not matched in data-group."
+        }
+      }
+      log local0.info "USER([ACCESS::session data get session.custom.mac_check_result]): $username / $msg"
+    }
+  }
+}
