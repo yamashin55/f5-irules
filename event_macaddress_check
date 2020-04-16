@@ -1,10 +1,11 @@
 when ACCESS_POLICY_AGENT_EVENT {
   # - If the MAC address is registered as a shared device, check whether the user name is registered in the data-group.
   #   Data-Group name of shared device: dg_share_macaddress
+  #   if not check username, set value := "Allow_ALL_User_Access". 
   #   ---------- dg_share_macaddress -----------
   #   "A8:13:74:93:62:9DA" := "<data-gorup-name>",
   #   "F6:8C:50:6B:5C:60A" := "dg_group_daily_user",
-  #   "F4:8C:50:6B:5C:61A" := "dg_group_daily_user",
+  #   "F4:8C:50:6B:5C:61A" := "Allow_ALL_User_Access",
   #   ---------- dg_group_daily_user -----------
   #   "<username>" := "",
   #   "user01" := "",
@@ -43,6 +44,12 @@ when ACCESS_POLICY_AGENT_EVENT {
         # Check share device. 
         if { [class match $mac_address equals dg_share_macaddress] } {
           set dgname [class lookup $mac_address dg_share_macaddress]
+            if {$dgname == "Allow_ALL_User_Access"} {
+              ACCESS::session data set session.custom.mac_check_result "OK"
+              set msg "ShareDevice: $dgname / MACAddr: $mac_address"
+              #log local0.info "USER(OK): $username / ShareDevice: $dgname / MACAddr: $mac_address"
+              break
+            }
             # Check username.
             if { [class match $username equals $dgname] } {
               ACCESS::session data set session.custom.mac_check_result "OK"
