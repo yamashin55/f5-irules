@@ -1,3 +1,7 @@
+when CLIENT_ACCEPTED {
+    ACCESS::restrict_irule_events disable
+}
+
 when HTTP_REQUEST {
 	# Check for post requests to the fake URI
 	if {[HTTP::uri] starts_with "/my.policy" && [HTTP::method] eq "POST"}{
