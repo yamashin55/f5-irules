@@ -1,0 +1,31 @@
+when RULE_INIT { 
+    set static::whitelist_ttl "30" 
+}
+when DNS_REQUEST {
+    set logmsg "TYPE: [DNS::question type] \[[DNS::question name]\]"
+
+    if { [DNS::question type] equals "A"  } then {
+        # log local0.debug "$logmsg"
+
+        switch [string tolower [DNS::question name]] {
+
+            "example.internal" {
+                log local0.info "\[HIT\] $logmsg"
+                DNS::answer insert "[DNS::question name]. $static::whitelist_ttl [DNS::question class] [DNS::question type] 10.10.10.10"
+                DNS::return
+            }
+            "yahoo.co.jp" {
+                log local0.info "\[HIT\] $logmsg"
+                DNS::answer insert "[DNS::question name]. $static::whitelist_ttl [DNS::question class] [DNS::question type] 10.10.10.10"
+                DNS::return
+            }
+            "yahoo.com" {
+                log local0.info "\[HIT\] $logmsg"
+                DNS::answer insert "[DNS::question name]. $static::whitelist_ttl [DNS::question class] [DNS::question type] 10.42.0.10"
+                DNS::return
+            }
+        }
+    } else {
+        log local0.info "\[*Not HIT*\] $logmsg"
+    }
+}
