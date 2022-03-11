@@ -1,0 +1,84 @@
+#
+# Name: virtual server connection limiting rule
+#
+
+when RULE_INIT {
+
+   # Log debug to /var/log/ltm? 1=yes, 0=no.
+   set static::conn_debug 1
+
+   # Maximum connection rate (new connections / time interval)
+   # To avoid the bug described in SOL11149, you could move this configuration to a datagroup
+   set static::conn_rate 8
+
+   # Time interval (in seconds)
+   # This shouldn't need to be changed.
+   # We track connections opened in the last X seconds
+   # set static::interval 1
+
+   #log local0. "Configured to enforce a rate of [expr {$static::conn_rate / $static::interval}] cps ($static::conn_rate connections / $static::interval second)"
+
+   # IP datagroup name which contains IP addresses/subnets to not track/rate limit
+   set static::whitelist_class vsratelimit_whitelist_class
+
+   # Generate a subtable name unique to this iRule and virtual server
+   #   We use the virtual server name with this prefix (vsratelimit_)
+   set static::tbl "vsratelimit"
+}
+when CLIENT_ACCEPTED {
+
+   # Don't process any of this iRule if the client IP is in the whitelist datagroup
+   if {[class match [IP::client_addr] equals vsratelimit_whitelist_class]}{
+
+      # Exit this event from this iRule
+      return
+   }
+
+   # Track this connection in the subtable using the client IP:port as a key
+   # set key [clock clicks]:[TMM::cmp_group]:[TMM::cmp_unit]
+   set key "[IP::client_addr] [TCP::client_port]"
+   
+   # Save the virtual server-specific subtable name (vsratelimit_)
+   set tbl ${static::tbl}_[virtual name]
+
+   # Check if we're under the connection limit for the virtual server
+   set current [table keys -subtable $tbl -count]
+
+   log local0. "$current"
+   if { $current >= $static::conn_rate } {
+
+      # We're over the rate limit, so reset the connection 
+      if { $static::conn_debug }{ log local0. "$key: Connection to [IP::local_addr]:[TCP::local_port]\
+         ([virtual name]). At limit, rejecting (current: $current / max: $static::conn_rate)" }
+      # reject
+      # apachebench stops when it gets a reset, so you can test with TCP::close to send a FIN and close the connection cleanly.
+      # TCP::close
+      set limited 1
+
+   } else {
+
+      # We're under the virtual server connection rate limit, 
+      # so add an entry for this client IP:port with a lifetime of X seconds
+      # table set -subtable $tbl $key " " indefinite $static::interval
+      table set -subtable $tbl $key " " 300 indefinite
+      if { $static::conn_debug }{ log local0. "$key: Connection to [IP::local_addr]:[TCP::local_port]\
+         ([virtual name]). Under limit, allowing (current: [table keys -subtable $tbl -count] / max: $static::conn_rate)" }
+   }
+}
+when HTTP_REQUEST {
+  if { $current < $static::conn_rate } {
+    log local0. "ALOW COUNT of $key is: $current"
+  } else {
+    log local0. "Redirect COUNT of $key is: $current"
+    table delete -subtable $tbl $key
+    table delete $key
+    HTTP::redirect "http://example.com/"
+  }
+}
+
+when CLIENT_CLOSED {
+   # When the client connection is closed, remove the table entry
+   table delete -subtable $tbl $key
+   table delete $key
+   log local0. "Table delete $tbl:[IP::client_addr] [TCP::client_port]"
+}
