@@ -1,0 +1,36 @@
+when ACCESS_POLICY_COMPLETED {
+  set vpn_start_time [clock clicks -milliseconds]
+  ACCESS::session data set "session.custom.sesstart" ${vpn_start_time}
+  ACCESS::session data set "session.custom.fmtstart" [clock format [clock seconds] -format "%d/%b/%Y:%H:%M:%S -%Z"]
+  ACCESS::session data set "session.custom.rmtip" [IP::remote_addr]
+  ACCESS::session data set "session.custom.vpnhost" [virtual name]
+  ACCESS::session data set "session.custom.sesssl" [SSL::cipher version]
+  ACCESS::session data set "session.custom.sessslcipher" [SSL::cipher name]
+}
+
+
+when ACCESS_SESSION_CLOSED {
+  set vpn_stop_time [ clock clicks -milliseconds ]
+  set vpn_start_tm [ACCESS::session data get "session.custom.sesstart"]  
+  set vpn_elapsed [expr {${vpn_stop_time} - ${vpn_start_tm}}]
+  set vpn_elapsed [expr {int([expr {${vpn_elapsed} / 1000}])}]
+  set vpn_elapsed_days [expr {int(${vpn_elapsed} / 8640)}] 
+  set vpn_elapsed [expr {$vpn_elapsed - [expr {$vpn_elapsed_days * 8640}]}]  
+  set vpn_elapsed_hr  [expr {int([expr {${vpn_elapsed} / 360}])}] 
+  set vpn_elapsed [expr {${vpn_elapsed} - [expr {${vpn_elapsed_hr} * 360}]}]  
+  set vpn_elapsed_min [expr {int([expr {${vpn_elapsed} / 60}])}]  
+  set vpn_elapsed [expr {${vpn_elapsed} - [expr {${vpn_elapsed_min} * 60}]}]  
+  set req_1 "time_session_started=[ACCESS::session data get "session.custom.fmtstart"]"
+  set req_2 "client_ip=[ACCESS::session data get "session.custom.rmtip"],assigned_ip=[ACCESS::session data get "session.assigned.clientip"]"
+  set req_3 "vpn_host=[ACCESS::session data get "session.custom.vpnhost"]"
+  set req_4 "user_name=[ACCESS::session data get "session.logon.last.username"]"  
+  set req_5 "SSL=\"[ACCESS::session data get "session.custom.sesssl"]\""
+  set req_5a "SSLcipher=\"[ACCESS::session data get "session.custom.sessslcipher"]\""
+  set resp_1 "time_session_ended=[clock format [clock seconds] -format "%d/%b/%Y:%H:%M:%S -%Z"]"
+  set resp_2 "session_id=[ACCESS::session data get session.user.sessionid]"
+  set resp_3 "vpn_run_time=${vpn_elapsed_days} days ${vpn_elapsed_hr}:${vpn_elapsed_min}:${vpn_elapsed}"
+  set resp_4 "vpn_end_reason=[ACCESS::session data get "session.end"]"
+  #set aclog [HSL::open -proto TCP -pool SplunkVPN ]
+  #HSL::send $aclog "$req_1,$resp_1,$req_4,$req_2,$resp_2,$resp_3,$resp_4,$req_3,$req_5,$req_5a\r\n"
+  log local0.info "$req_1,$resp_1,$req_4,$req_2,$resp_2,$resp_3,$resp_4,$req_3,$req_5,$req_5a"
+}
