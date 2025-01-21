@@ -1,0 +1,22 @@
+
+(tmos)# list ltm data-group internal skip-apm-auth
+ltm data-group internal skip-apm-auth {
+    records {
+        app3.example.org/abc/ { }
+        app3.example.org/echo/ { }
+    }
+    type string
+}
+
+
+```
+when HTTP_REQUEST {
+    if { [class match [HTTP::host][string tolower [HTTP::uri]] starts_with skip-apm-auth] } {
+            ACCESS::disable
+            log "ACCESS::Disabled : [HTTP::host][string tolower [HTTP::uri]]"
+    } else {
+            ACCESS::enable
+            log "ACCESS::Enabled : [HTTP::host][string tolower [HTTP::uri]]"
+    }
+}
+```
