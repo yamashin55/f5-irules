@@ -1,0 +1,37 @@
+when RULE_INIT {
+   #0:not logging / 1:Deny Only / 2:Deny and Allow
+   set static::debug 3
+
+   #Check Subject Value
+   set static::cmn   "CN=client3"
+   set static::org   "O=Sample Corp"
+}
+when CLIENTSSL_CLIENTCERT {
+   if { $static::debug > 0 }{ 
+      set logstr "\[client=[IP::client_addr]:[TCP::client_port]\]; \[vip=[IP::local_addr]:[TCP::local_port]\]; \[vs=[virtual name]\]"
+   }
+
+   # Check if client provided a cert
+   if {[SSL::cert 0] eq ""}{
+
+      # Reset the connection
+      if { $static::debug > 2 }{ log "REJECT/NoCertProvide; $logstr" }
+      reject
+
+   } else {
+      #Example Subject DN:  C=JP,ST=Tokyo,L=Chiyoda-ku,O=Sample Corp,OU=Prod System,CN=John Smith
+      set subject_dn [X509::subject [SSL::cert 0]]
+
+      #Check if the client certificate contains the correct O and a CN from the list
+      if {($subject_dn contains $static::cmn) and ($subject_dn contains $static::org)} {
+
+         #Accept the client cert
+         if { $static::debug > 1 }{ log "ACCEPTED/CertMatching; $logstr \[$subject_dn\]" }
+
+      } else {
+         if { $static::debug > 0 }{ log "REJECT/CertNotMatching; $logstr \[$subject_dn\]" }
+         reject
+
+      }
+   }
+}
